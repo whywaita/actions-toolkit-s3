@@ -47,3 +47,15 @@
 ### 1.0.9
   - Use @azure/ms-rest-js v2.6.0
   - Use @azure/storage-blob v12.8.0
+
+### 1.0.10
+- Update `lockfileVersion` to `v2` in `package-lock.json [#1022](https://github.com/actions/toolkit/pull/1022)
+
+### 1.0.11
+- Fix file downloads > 2GB([issue](https://github.com/actions/cache/issues/773))
+
+### 2.0.0
+- Added support to check if Actions cache service feature is available or not [#1028](https://github.com/actions/toolkit/pull/1028)
+
+### 2.0.3
+- Update to v2.0.0 of `@actions/http-client`

@@ -18,7 +18,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(require("@actions/core"));
 const http_client_1 = require("@actions/http-client");
-const auth_1 = require("@actions/http-client/auth");
+const auth_1 = require("@actions/http-client/lib/auth");
 const client_s3_1 = require("@aws-sdk/client-s3");
 const lib_storage_1 = require("@aws-sdk/lib-storage");
 const crypto = __importStar(require("crypto"));
@@ -31,10 +31,7 @@ const options_1 = require("../options");
 const requestUtils_1 = require("./requestUtils");
 const versionSalt = '1.0';
 function getCacheApiUrl(resource) {
-    // Ideally we just use ACTIONS_CACHE_URL
-    const baseUrl = (process.env['ACTIONS_CACHE_URL'] ||
-        process.env['ACTIONS_RUNTIME_URL'] ||
-        '').replace('pipelines', 'artifactcache');
+    const baseUrl = process.env['ACTIONS_CACHE_URL'] || '';
     if (!baseUrl) {
         throw new Error('Cache Service Url not found, unable to restore cache.');
     }
@@ -163,21 +160,25 @@ function downloadCache(cacheEntry, archivePath, options, s3Options, s3BucketName
 exports.downloadCache = downloadCache;
 // Reserve Cache
 function reserveCache(key, paths, options, s3Options, s3BucketName) {
-    var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
         if (s3Options && s3BucketName) {
-            return 0;
+            return {
+                statusCode: 200,
+                result: null,
+                headers: {}
+            };
         }
         const httpClient = createHttpClient();
         const version = getCacheVersion(paths, options === null || options === void 0 ? void 0 : options.compressionMethod);
         const reserveCacheRequest = {
             key,
-            version
+            version,
+            cacheSize: options === null || options === void 0 ? void 0 : options.cacheSize
         };
         const response = yield requestUtils_1.retryTypedResponse('reserveCache', () => __awaiter(this, void 0, void 0, function* () {
             return httpClient.postJson(getCacheApiUrl('caches'), reserveCacheRequest);
         }));
-        return (_b = (_a = response === null || response === void 0 ? void 0 : response.result) === null || _a === void 0 ? void 0 : _a.cacheId) !== null && _b !== void 0 ? _b : -1;
+        return response;
     });
 }
 exports.reserveCache = reserveCache;

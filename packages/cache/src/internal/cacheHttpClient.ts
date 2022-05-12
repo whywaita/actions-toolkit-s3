@@ -1,7 +1,10 @@
 import * as core from '@actions/core'
 import {HttpClient} from '@actions/http-client'
-import {BearerCredentialHandler} from '@actions/http-client/auth'
-import {IRequestOptions, ITypedResponse} from '@actions/http-client/interfaces'
+import {BearerCredentialHandler} from '@actions/http-client/lib/auth'
+import {
+  RequestOptions,
+  TypedResponse
+} from '@actions/http-client/lib/interfaces'
 import {
   ListObjectsV2Command,
   ListObjectsV2CommandInput,
@@ -21,7 +24,8 @@ import {
   InternalCacheOptions,
   CommitCacheRequest,
   ReserveCacheRequest,
-  ReserveCacheResponse
+  ReserveCacheResponse,
+  ITypedResponseWithError
 } from './contracts'
 import {downloadCacheHttpClient, downloadCacheStorageS3, downloadCacheStorageSDK} from './downloadUtils'
 import {
@@ -39,12 +43,7 @@ import {
 const versionSalt = '1.0'
 
 function getCacheApiUrl(resource: string): string {
-  // Ideally we just use ACTIONS_CACHE_URL
-  const baseUrl: string = (
-    process.env['ACTIONS_CACHE_URL'] ||
-    process.env['ACTIONS_RUNTIME_URL'] ||
-    ''
-  ).replace('pipelines', 'artifactcache')
+  const baseUrl: string = process.env['ACTIONS_CACHE_URL'] || ''
   if (!baseUrl) {
     throw new Error('Cache Service Url not found, unable to restore cache.')
   }
@@ -58,8 +57,8 @@ function createAcceptHeader(type: string, apiVersion: string): string {
   return `${type};api-version=${apiVersion}`
 }
 
-function getRequestOptions(): IRequestOptions {
-  const requestOptions: IRequestOptions = {
+function getRequestOptions(): RequestOptions {
+  const requestOptions: RequestOptions = {
     headers: {
       Accept: createAcceptHeader('application/json', '6.0-preview.1')
     }
@@ -235,9 +234,13 @@ export async function reserveCache(
   options?: InternalCacheOptions,
   s3Options?: S3ClientConfig,
   s3BucketName?: string
-): Promise<number> {
+): Promise<ITypedResponseWithError<ReserveCacheResponse>> {
   if (s3Options && s3BucketName) {
-    return 0
+    return {
+      statusCode: 200,
+      result: null,
+      headers: {}
+    }
   }
 
   const httpClient = createHttpClient()
@@ -245,7 +248,8 @@ export async function reserveCache(
 
   const reserveCacheRequest: ReserveCacheRequest = {
     key,
-    version
+    version,
+    cacheSize: options?.cacheSize
   }
   const response = await retryTypedResponse('reserveCache', async () =>
     httpClient.postJson<ReserveCacheResponse>(
@@ -253,7 +257,7 @@ export async function reserveCache(
       reserveCacheRequest
     )
   )
-  return response?.result?.cacheId ?? -1
+  return response
 }
 
 function getContentRange(start: number, end: number): string {
@@ -423,7 +427,7 @@ async function commitCache(
   httpClient: HttpClient,
   cacheId: number,
   filesize: number
-): Promise<ITypedResponse<null>> {
+): Promise<TypedResponse<null>> {
   const commitCacheRequest: CommitCacheRequest = {size: filesize}
   return await retryTypedResponse('commitCache', async () =>
     httpClient.postJson<null>(
