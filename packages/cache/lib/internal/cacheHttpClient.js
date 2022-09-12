@@ -68,7 +68,7 @@ function getCacheVersion(paths, compressionMethod) {
 }
 exports.getCacheVersion = getCacheVersion;
 function getCacheEntryS3(s3Options, s3BucketName, keys, paths) {
-    var _a, _b;
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
         const primaryKey = keys[0];
         const s3client = new client_s3_1.S3Client(s3Options);
@@ -97,18 +97,62 @@ function getCacheEntryS3(s3Options, s3BucketName, keys, paths) {
         }
         // not found in primary key, So fallback to next keys
         const notPrimaryKey = keys.slice(1);
-        for (const c of contents) {
-            for (const k of notPrimaryKey) {
-                if (c.Key === k) {
-                    return {
-                        cacheKey: k,
-                        creationTime: (_b = c.LastModified) === null || _b === void 0 ? void 0 : _b.toString()
-                    };
-                }
-            }
+        const found = searchRestoreKeyEntry(notPrimaryKey, contents);
+        if (found != null && found.LastModified) {
+            return {
+                cacheKey: found.Key,
+                creationTime: found.LastModified.toString()
+            };
         }
         return null;
     });
+}
+function searchRestoreKeyEntry(notPrimaryKey, entries) {
+    for (const k of notPrimaryKey) {
+        const found = _searchRestoreKeyEntry(k, entries);
+        if (found != null) {
+            return found;
+        }
+    }
+    return null;
+}
+function _searchRestoreKeyEntry(notPrimaryKey, entries) {
+    var _a, _b;
+    let matchPrefix = new Array();
+    for (const entry of entries) {
+        if (entry.Key === notPrimaryKey) {
+            // extractly match, Use this entry
+            return {
+                cacheKey: entry.Key,
+                creationTime: (_a = entry.LastModified) === null || _a === void 0 ? void 0 : _a.toString()
+            };
+        }
+        if ((_b = entry.Key) === null || _b === void 0 ? void 0 : _b.startsWith(notPrimaryKey)) {
+            matchPrefix.push(entry);
+        }
+    }
+    if (matchPrefix.length === 0) {
+        // not found, go to next key
+        return null;
+    }
+    matchPrefix.sort(function (i, j) {
+        var _a, _b, _c, _d, _e, _f;
+        if ((i.LastModified == undefined) || (j.LastModified == undefined)) {
+            return 0;
+        }
+        if (((_a = i.LastModified) === null || _a === void 0 ? void 0 : _a.getTime()) === ((_b = j.LastModified) === null || _b === void 0 ? void 0 : _b.getTime())) {
+            return 0;
+        }
+        if (((_c = i.LastModified) === null || _c === void 0 ? void 0 : _c.getTime()) > ((_d = j.LastModified) === null || _d === void 0 ? void 0 : _d.getTime())) {
+            return -1;
+        }
+        if (((_e = i.LastModified) === null || _e === void 0 ? void 0 : _e.getTime()) < ((_f = j.LastModified) === null || _f === void 0 ? void 0 : _f.getTime())) {
+            return 1;
+        }
+        return 0;
+    });
+    // return newest entry
+    return matchPrefix[0];
 }
 function getCacheEntry(keys, paths, options, s3Options, s3BucketName) {
     return __awaiter(this, void 0, void 0, function* () {

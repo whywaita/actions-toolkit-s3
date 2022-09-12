@@ -144,18 +144,63 @@ async function getCacheEntryS3(
 
   // not found in primary key, So fallback to next keys
   const notPrimaryKey = keys.slice(1)
-  for (const c of contents) {
-    for (const k of notPrimaryKey) {
-      if (c.Key === k) {
-        return {
-          cacheKey: k,
-          creationTime: c.LastModified?.toString()
-        }
-      }
+  const found = searchRestoreKeyEntry(notPrimaryKey, contents)
+  if (found != null&& found.LastModified) {
+    return {
+      cacheKey: found.Key,
+      creationTime: found.LastModified.toString()
     }
   }
 
   return null
+}
+
+
+
+function searchRestoreKeyEntry(notPrimaryKey: string[], entries: _content[]):  _content|null  {
+  for (const k of notPrimaryKey) {
+    const found = _searchRestoreKeyEntry(k, entries)
+    if (found != null) {
+      return found
+    }
+  }
+
+  return null
+}
+
+function _searchRestoreKeyEntry(notPrimaryKey: string, entries: _content[]): _content|null {
+  let matchPrefix: _content[] = new Array();
+
+  for (const entry of entries) {
+    if (entry.Key === notPrimaryKey) {
+      // extractly match, Use this entry
+      return {
+        cacheKey: entry.Key,
+        creationTime: entry.LastModified?.toString()
+      } as _content
+    }
+
+    if (entry.Key?.startsWith(notPrimaryKey)) {
+      matchPrefix.push(entry)
+    }
+  }
+
+  if (matchPrefix.length === 0) {
+    // not found, go to next key
+    return null
+  }
+
+  matchPrefix.sort(function(i, j) {
+    if ((i.LastModified == undefined) || (j.LastModified == undefined)) { return 0 }
+    if (i.LastModified?.getTime() === j.LastModified?.getTime()) { return 0 }
+    if (i.LastModified?.getTime() > j.LastModified?.getTime()) { return -1 }
+    if (i.LastModified?.getTime() < j.LastModified?.getTime()) { return 1 }
+
+    return 0
+  })
+
+  // return newest entry
+  return matchPrefix[0]
 }
 
 export async function getCacheEntry(
