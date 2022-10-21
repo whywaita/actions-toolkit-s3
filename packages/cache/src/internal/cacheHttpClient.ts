@@ -174,10 +174,7 @@ function _searchRestoreKeyEntry(notPrimaryKey: string, entries: _content[]): _co
   for (const entry of entries) {
     if (entry.Key === notPrimaryKey) {
       // extractly match, Use this entry
-      return {
-        cacheKey: entry.Key,
-        creationTime: entry.LastModified?.toString()
-      } as _content
+      return entry
     }
 
     if (entry.Key?.startsWith(notPrimaryKey)) {
