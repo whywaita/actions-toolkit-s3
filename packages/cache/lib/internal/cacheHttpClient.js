@@ -117,17 +117,14 @@ function searchRestoreKeyEntry(notPrimaryKey, entries) {
     return null;
 }
 function _searchRestoreKeyEntry(notPrimaryKey, entries) {
-    var _a, _b;
+    var _a;
     let matchPrefix = new Array();
     for (const entry of entries) {
         if (entry.Key === notPrimaryKey) {
             // extractly match, Use this entry
-            return {
-                cacheKey: entry.Key,
-                creationTime: (_a = entry.LastModified) === null || _a === void 0 ? void 0 : _a.toString()
-            };
+            return entry;
         }
-        if ((_b = entry.Key) === null || _b === void 0 ? void 0 : _b.startsWith(notPrimaryKey)) {
+        if ((_a = entry.Key) === null || _a === void 0 ? void 0 : _a.startsWith(notPrimaryKey)) {
             matchPrefix.push(entry);
         }
     }
