@@ -126,24 +126,15 @@ function getVersion(app) {
 // Use zstandard if possible to maximize cache performance
 function getCompressionMethod() {
     return __awaiter(this, void 0, void 0, function* () {
-        if (process.platform === 'win32' && !(yield isGnuTarInstalled())) {
+        if ((process.platform === 'win32' && !(yield isGnuTarInstalled())) || !(yield isZstdInstalled())) {
             // Disable zstd due to bug https://github.com/actions/cache/issues/301
             return constants_1.CompressionMethod.Gzip;
         }
         const versionOutput = yield getVersion('zstd');
         const version = semver.clean(versionOutput);
-        if (!versionOutput.toLowerCase().includes('zstd command line interface')) {
-            // zstd is not installed
-            return constants_1.CompressionMethod.Gzip;
-        }
-        else if (!version || semver.lt(version, 'v1.3.2')) {
-            // zstd is installed but using a version earlier than v1.3.2
-            // v1.3.2 is required to use the `--long` options in zstd
-            return constants_1.CompressionMethod.ZstdWithoutLong;
-        }
-        else {
-            return constants_1.CompressionMethod.Zstd;
-        }
+        // zstd is installed but using a version earlier than v1.3.2
+        // v1.3.2 is required to use the `--long` options in zstd
+        return !version || semver.lt(version, 'v1.3.2') ? constants_1.CompressionMethod.ZstdWithoutLong : constants_1.CompressionMethod.Zstd;
     });
 }
 exports.getCompressionMethod = getCompressionMethod;
@@ -160,6 +151,18 @@ function isGnuTarInstalled() {
     });
 }
 exports.isGnuTarInstalled = isGnuTarInstalled;
+function isZstdInstalled() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            yield io.which('zstd', true);
+            return true;
+        }
+        catch (error) {
+            return false;
+        }
+    });
+}
+exports.isZstdInstalled = isZstdInstalled;
 function assertDefined(name, value) {
     if (value === undefined) {
         throw Error(`Expected ${name} but value was undefiend`);
