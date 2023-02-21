@@ -8,5 +8,6 @@ export declare function unlinkFile(filePath: fs.PathLike): Promise<void>;
 export declare function getCompressionMethod(): Promise<CompressionMethod>;
 export declare function getCacheFileName(compressionMethod: CompressionMethod): string;
 export declare function isGnuTarInstalled(): Promise<boolean>;
+export declare function isZstdInstalled(): Promise<boolean>;
 export declare function assertDefined<T>(name: string, value?: T): T;
 export declare function isGhes(): boolean;
