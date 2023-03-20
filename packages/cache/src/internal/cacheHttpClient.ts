@@ -111,14 +111,18 @@ async function getCacheEntryS3(
   const primaryKey = keys[0]
 
   const s3client = new S3Client(s3Options)
+
+  let contents: _content[] = new Array();
+  let s3ContinuationToken = null
+
   const param = {
     Bucket: s3BucketName
   } as ListObjectsV2CommandInput
 
-  let contents: _content[] = new Array();
-  let hasNext: boolean = true
+  for (;;) {
+    param.ContinuationToken=s3ContinuationToken
+    core.debug('param', param)
 
-  while (hasNext) {
     const response = await s3client.send(new ListObjectsV2Command(param))
     if (!response.Contents) {
       throw new Error(`Cannot found object in bucket ${s3BucketName}`)
@@ -132,7 +136,6 @@ async function getCacheEntryS3(
       }
     }
 
-    hasNext = response.IsTruncated ?? false
 
     response.Contents.map((obj: _Object) =>
       contents.push({
@@ -140,6 +143,12 @@ async function getCacheEntryS3(
         LastModified: obj.LastModified
       })
     )
+
+    if (response.IsTruncated) {
+      s3ContinuationToken = response.ContinuationToken
+    } else {
+      break
+    }
   }
 
   // not found in primary key, So fallback to next keys
@@ -366,18 +375,18 @@ async function uploadFileS3(
       client: new S3Client(s3options),
       queueSize: concurrency,
       partSize: maxChunkSize,
-  
+
       params: {
         Bucket: s3BucketName,
         Key: key,
         Body: fileStream
       }
     })
-  
+
     parallelUpload.on("httpUploadProgress", (progress: Progress) => {
       core.debug(`Uploading chunk progress: ${JSON.stringify(progress)}`)
     })
-  
+
     await parallelUpload.done()
   } catch (error) {
     throw new Error(
