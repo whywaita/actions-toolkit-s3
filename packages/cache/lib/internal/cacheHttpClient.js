@@ -68,16 +68,16 @@ function getCacheVersion(paths, compressionMethod) {
 }
 exports.getCacheVersion = getCacheVersion;
 function getCacheEntryS3(s3Options, s3BucketName, keys, paths) {
-    var _a;
     return __awaiter(this, void 0, void 0, function* () {
         const primaryKey = keys[0];
         const s3client = new client_s3_1.S3Client(s3Options);
+        let contents = new Array();
+        let s3ContinuationToken = null;
         const param = {
             Bucket: s3BucketName
         };
-        let contents = new Array();
-        let hasNext = true;
-        while (hasNext) {
+        for (;;) {
+            param.ContinuationToken = s3ContinuationToken;
             const response = yield s3client.send(new client_s3_1.ListObjectsV2Command(param));
             if (!response.Contents) {
                 throw new Error(`Cannot found object in bucket ${s3BucketName}`);
@@ -89,11 +89,16 @@ function getCacheEntryS3(s3Options, s3BucketName, keys, paths) {
                     creationTime: found.LastModified.toString()
                 };
             }
-            hasNext = (_a = response.IsTruncated) !== null && _a !== void 0 ? _a : false;
             response.Contents.map((obj) => contents.push({
                 Key: obj.Key,
                 LastModified: obj.LastModified
             }));
+            if (response.IsTruncated) {
+                s3ContinuationToken = response.ContinuationToken;
+            }
+            else {
+                break;
+            }
         }
         // not found in primary key, So fallback to next keys
         const notPrimaryKey = keys.slice(1);
