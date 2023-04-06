@@ -92,10 +92,7 @@ function getCacheEntryS3(s3Options, s3BucketName, keys, paths) {
             if (!response.Contents) {
                 throw new Error(`Cannot found object in bucket ${s3BucketName}`);
             }
-            core.debug(`found objects ${response.Contents.length}`);
-            core.debug(`IsTruncated ${response.IsTruncated}`);
-            core.debug(`ContinuationToken ${response.ContinuationToken}`);
-            core.debug(`NextContinuationToken ${response.NextContinuationToken}`);
+            core.debug(`Found objects ${response.Contents.length}`);
             const found = response.Contents.find((content) => content.Key === primaryKey);
             if (found && found.LastModified) {
                 return {
