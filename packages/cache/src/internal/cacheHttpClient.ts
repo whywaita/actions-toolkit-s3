@@ -8,6 +8,7 @@ import {
 import {
   ListObjectsV2Command,
   ListObjectsV2CommandInput,
+  ListObjectsV2CommandOutput,
   S3Client,
   S3ClientConfig,
   _Object
@@ -114,18 +115,28 @@ async function getCacheEntryS3(
 
   let contents: _content[] = new Array();
   let s3ContinuationToken = null
+  let count = 0
 
   const param = {
     Bucket: s3BucketName
   } as ListObjectsV2CommandInput
 
   for (;;) {
-    param.ContinuationToken = s3ContinuationToken
+    core.debug(`ListObjects Count: ${count}`)
+    if (s3ContinuationToken != null) {
+      param.ContinuationToken = s3ContinuationToken
+    }
 
-    const response = await s3client.send(new ListObjectsV2Command(param))
+    let response: ListObjectsV2CommandOutput
+    try {
+      response = await s3client.send(new ListObjectsV2Command(param))
+    } catch (e) {
+      throw new Error(`Error from S3: ${e}`)
+    }
     if (!response.Contents) {
       throw new Error(`Cannot found object in bucket ${s3BucketName}`)
     }
+    core.debug(`Found objects ${response.Contents.length}`)
 
     const found = response.Contents.find((content: _Object) => content.Key === primaryKey)
     if (found && found.LastModified) {
@@ -135,25 +146,27 @@ async function getCacheEntryS3(
       }
     }
 
-
     response.Contents.map((obj: _Object) =>
       contents.push({
         Key: obj.Key,
         LastModified: obj.LastModified
       })
     )
+    core.debug(`Total objects ${contents.length}`)
 
     if (response.IsTruncated) {
-      s3ContinuationToken = response.ContinuationToken
+      s3ContinuationToken = response.NextContinuationToken
     } else {
       break
     }
+
+    count++
   }
 
-  // not found in primary key, So fallback to next keys
+  core.debug('Not found in primary key, will fallback to restore keys')
   const notPrimaryKey = keys.slice(1)
   const found = searchRestoreKeyEntry(notPrimaryKey, contents)
-  if (found != null&& found.LastModified) {
+  if (found != null && found.LastModified) {
     return {
       cacheKey: found.Key,
       creationTime: found.LastModified.toString()

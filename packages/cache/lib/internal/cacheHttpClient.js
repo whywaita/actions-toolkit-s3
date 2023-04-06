@@ -73,15 +73,29 @@ function getCacheEntryS3(s3Options, s3BucketName, keys, paths) {
         const s3client = new client_s3_1.S3Client(s3Options);
         let contents = new Array();
         let s3ContinuationToken = null;
+        let count = 0;
         const param = {
             Bucket: s3BucketName
         };
         for (;;) {
-            param.ContinuationToken = s3ContinuationToken;
-            const response = yield s3client.send(new client_s3_1.ListObjectsV2Command(param));
+            core.debug(`ListObjects Count: ${count}`);
+            if (s3ContinuationToken != null) {
+                param.ContinuationToken = s3ContinuationToken;
+            }
+            let response;
+            try {
+                response = yield s3client.send(new client_s3_1.ListObjectsV2Command(param));
+            }
+            catch (e) {
+                throw new Error(`Error from S3: ${e}`);
+            }
             if (!response.Contents) {
                 throw new Error(`Cannot found object in bucket ${s3BucketName}`);
             }
+            core.debug(`found objects ${response.Contents.length}`);
+            core.debug(`IsTruncated ${response.IsTruncated}`);
+            core.debug(`ContinuationToken ${response.ContinuationToken}`);
+            core.debug(`NextContinuationToken ${response.NextContinuationToken}`);
             const found = response.Contents.find((content) => content.Key === primaryKey);
             if (found && found.LastModified) {
                 return {
@@ -93,14 +107,16 @@ function getCacheEntryS3(s3Options, s3BucketName, keys, paths) {
                 Key: obj.Key,
                 LastModified: obj.LastModified
             }));
+            core.debug(`Total objects ${contents.length}`);
             if (response.IsTruncated) {
-                s3ContinuationToken = response.ContinuationToken;
+                s3ContinuationToken = response.NextContinuationToken;
             }
             else {
                 break;
             }
+            count++;
         }
-        // not found in primary key, So fallback to next keys
+        core.debug('Not found in primary key, will fallback to restore keys');
         const notPrimaryKey = keys.slice(1);
         const found = searchRestoreKeyEntry(notPrimaryKey, contents);
         if (found != null && found.LastModified) {
