@@ -134,6 +134,9 @@ async function getCacheEntryS3(
       throw new Error(`Error from S3: ${e}`)
     }
     if (!response.Contents) {
+        if (contents.length != 0) {
+            break;
+        }
       throw new Error(`Cannot found object in bucket ${s3BucketName}`)
     }
     core.debug(`Found objects ${response.Contents.length}`)
