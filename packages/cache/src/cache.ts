@@ -97,12 +97,16 @@ export async function restoreCache(
   let archivePath = ''
   try {
     // path are needed to compute version
-    const cacheEntry = await cacheHttpClient.getCacheEntry(keys, paths, {
-      compressionMethod,
-      enableCrossOsArchive,
+    const cacheEntry = await cacheHttpClient.getCacheEntry(
+      keys,
+      paths,
+      {
+        compressionMethod,
+        enableCrossOsArchive
+      },
       s3Options,
       s3BucketName
-    })
+    )
     if (!cacheEntry?.archiveLocation) {
       // Cache not found
       return undefined
@@ -125,7 +129,7 @@ export async function restoreCache(
       archivePath,
       options,
       s3Options,
-      s3BucketName,
+      s3BucketName
     )
 
     if (core.isDebug()) {
@@ -234,7 +238,8 @@ export async function saveCache(
           enableCrossOsArchive,
           cacheSize: archiveFileSize
         },
-        s3Options, s3BucketName
+        s3Options,
+        s3BucketName
       )
 
       if (reserveCacheResponse?.result?.cacheId) {
@@ -254,7 +259,14 @@ export async function saveCache(
     }
 
     core.debug(`Saving Cache (ID: ${cacheId})`)
-    await cacheHttpClient.saveCache(cacheId, archivePath, key, options, s3Options, s3BucketName)
+    await cacheHttpClient.saveCache(
+      cacheId,
+      archivePath,
+      key,
+      options,
+      s3Options,
+      s3BucketName
+    )
   } catch (error) {
     const typedError = error as Error
     if (typedError.name === ValidationError.name) {

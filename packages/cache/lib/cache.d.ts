@@ -21,17 +21,20 @@ export declare function isFeatureAvailable(): boolean;
  * @param options cache download options
  * @param s3Options upload options for AWS S3
  * @param s3BucketName a name of AWS S3 bucket
+ * @param downloadOptions cache download options
+ * @param enableCrossOsArchive an optional boolean enabled to restore on windows any cache created on any platform
  * @returns string returns the key for the cache hit, otherwise returns undefined
  */
-export declare function restoreCache(paths: string[], primaryKey: string, restoreKeys?: string[], options?: DownloadOptions, s3Options?: S3ClientConfig, s3BucketName?: string): Promise<string | undefined>;
+export declare function restoreCache(paths: string[], primaryKey: string, restoreKeys?: string[], options?: DownloadOptions, enableCrossOsArchive?: boolean, s3Options?: S3ClientConfig, s3BucketName?: string): Promise<string | undefined>;
 /**
  * Saves a list of files with the specified key
  *
  * @param paths a list of file paths to be cached
  * @param key an explicit key for restoring the cache
+ * @param enableCrossOsArchive an optional boolean enabled to save cache on windows which could be restored on any platform
  * @param options cache upload options
  * @param s3Options upload options for AWS S3
  * @param s3BucketName a name of AWS S3 bucket
  * @returns number returns cacheId if the cache was saved successfully and throws an error if save fails
  */
-export declare function saveCache(paths: string[], key: string, options?: UploadOptions, s3Options?: S3ClientConfig, s3BucketName?: string): Promise<number>;
+export declare function saveCache(paths: string[], key: string, options?: UploadOptions, enableCrossOsArchive?: boolean, s3Options?: S3ClientConfig, s3BucketName?: string): Promise<number>;
