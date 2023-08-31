@@ -4,8 +4,11 @@
     "baseUrl": "./",
     "outDir": "./lib",
     "rootDir": "./src",
-    "lib": ["es6", "dom"],
-    "noImplicitAny": false
+    "lib": [
+      "es6",
+      "dom"
+    ],
+    "useUnknownInCatchVariables": false
   },
   "include": [
     "./src"
