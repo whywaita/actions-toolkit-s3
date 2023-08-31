@@ -63,7 +63,6 @@ export function isFeatureAvailable(): boolean {
  * @param options cache download options
  * @param s3Options upload options for AWS S3
  * @param s3BucketName a name of AWS S3 bucket
- * @param downloadOptions cache download options
  * @param enableCrossOsArchive an optional boolean enabled to restore on windows any cache created on any platform
  * @returns string returns the key for the cache hit, otherwise returns undefined
  */
