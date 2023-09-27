@@ -61,6 +61,7 @@ export function isFeatureAvailable(): boolean {
  * @param primaryKey an explicit key for restoring the cache
  * @param restoreKeys an optional ordered list of keys to use for restoring the cache if no cache hit occurred for key
  * @param options cache download options
+ * @param enableCrossOsArchive an optional boolean enabled to restore on windows any cache created on any platform
  * @param s3Options upload options for AWS S3
  * @param s3BucketName a name of AWS S3 bucket
  * @returns string returns the key for the cache hit, otherwise returns undefined
@@ -70,6 +71,7 @@ export async function restoreCache(
   primaryKey: string,
   restoreKeys?: string[],
   options?: DownloadOptions,
+  enableCrossOsArchive = false,
   s3Options?: S3ClientConfig,
   s3BucketName?: string
 ): Promise<string | undefined> {
@@ -91,30 +93,42 @@ export async function restoreCache(
   }
 
   const compressionMethod = await utils.getCompressionMethod()
-
-  // path are needed to compute version
-  const cacheEntry = await cacheHttpClient.getCacheEntry(keys, paths, {
-    compressionMethod
-  }, s3Options, s3BucketName)
-  if (!cacheEntry?.archiveLocation && !cacheEntry?.cacheKey) {
-    // Cache not found
-    return undefined
-  }
-
-  const archivePath = path.join(
-    await utils.createTempDirectory(),
-    utils.getCacheFileName(compressionMethod)
-  )
-  core.debug(`Archive Path: ${archivePath}`)
-
+  let archivePath = ''
   try {
+    // path are needed to compute version
+    const cacheEntry = await cacheHttpClient.getCacheEntry(
+      keys,
+      paths,
+      {
+        compressionMethod,
+        enableCrossOsArchive
+      },
+      s3Options,
+      s3BucketName
+    )
+    if (!cacheEntry?.archiveLocation) {
+      // Cache not found
+      return undefined
+    }
+
+    if (options?.lookupOnly) {
+      core.info('Lookup only - skipping download')
+      return cacheEntry.cacheKey
+    }
+
+    archivePath = path.join(
+      await utils.createTempDirectory(),
+      utils.getCacheFileName(compressionMethod)
+    )
+    core.debug(`Archive Path: ${archivePath}`)
+
     // Download the cache from the cache entry
     await cacheHttpClient.downloadCache(
       cacheEntry,
       archivePath,
       options,
       s3Options,
-      s3BucketName,
+      s3BucketName
     )
 
     if (core.isDebug()) {
@@ -130,6 +144,16 @@ export async function restoreCache(
 
     await extractTar(archivePath, compressionMethod)
     core.info('Cache restored successfully')
+
+    return cacheEntry.cacheKey
+  } catch (error) {
+    const typedError = error as Error
+    if (typedError.name === ValidationError.name) {
+      throw error
+    } else {
+      // Supress all non-validation cache related errors because caching should be optional
+      core.warning(`Failed to restore: ${(error as Error).message}`)
+    }
   } finally {
     // Try to delete the archive to save space
     try {
@@ -139,7 +163,7 @@ export async function restoreCache(
     }
   }
 
-  return cacheEntry.cacheKey
+  return undefined
 }
 
 /**
@@ -147,6 +171,7 @@ export async function restoreCache(
  *
  * @param paths a list of file paths to be cached
  * @param key an explicit key for restoring the cache
+ * @param enableCrossOsArchive an optional boolean enabled to save cache on windows which could be restored on any platform
  * @param options cache upload options
  * @param s3Options upload options for AWS S3
  * @param s3BucketName a name of AWS S3 bucket
@@ -156,6 +181,7 @@ export async function saveCache(
   paths: string[],
   key: string,
   options?: UploadOptions,
+  enableCrossOsArchive = false,
   s3Options?: S3ClientConfig,
   s3BucketName?: string
 ): Promise<number> {
@@ -163,11 +189,17 @@ export async function saveCache(
   checkKey(key)
 
   const compressionMethod = await utils.getCompressionMethod()
-  let cacheId = 0
+  let cacheId = -1
 
   const cachePaths = await utils.resolvePaths(paths)
   core.debug('Cache Paths:')
   core.debug(`${JSON.stringify(cachePaths)}`)
+
+  if (cachePaths.length === 0) {
+    throw new Error(
+      `Path Validation Error: Path(s) specified in the action for caching do(es) not exist, hence no cache is being saved.`
+    )
+  }
 
   const archiveFolder = await utils.createTempDirectory()
   const archivePath = path.join(
@@ -202,9 +234,11 @@ export async function saveCache(
         paths,
         {
           compressionMethod,
+          enableCrossOsArchive,
           cacheSize: archiveFileSize
         },
-        s3Options, s3BucketName
+        s3Options,
+        s3BucketName
       )
 
       if (reserveCacheResponse?.result?.cacheId) {
@@ -224,7 +258,23 @@ export async function saveCache(
     }
 
     core.debug(`Saving Cache (ID: ${cacheId})`)
-    await cacheHttpClient.saveCache(cacheId, archivePath, key, options, s3Options, s3BucketName)
+    await cacheHttpClient.saveCache(
+      cacheId,
+      archivePath,
+      key,
+      options,
+      s3Options,
+      s3BucketName
+    )
+  } catch (error) {
+    const typedError = error as Error
+    if (typedError.name === ValidationError.name) {
+      throw error
+    } else if (typedError.name === ReserveCacheError.name) {
+      core.info(`Failed to save: ${typedError.message}`)
+    } else {
+      core.warning(`Failed to save: ${typedError.message}`)
+    }
   } finally {
     // Try to delete the archive to save space
     try {

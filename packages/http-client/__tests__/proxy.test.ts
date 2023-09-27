@@ -19,7 +19,7 @@ describe('proxy', () => {
       _proxyServer.listen(port, () => resolve())
     })
     _proxyServer.on('connect', req => {
-      _proxyConnects.push(req.url)
+      _proxyConnects.push(req.url ?? '')
     })
   })
 
@@ -91,6 +91,12 @@ describe('proxy', () => {
     expect(proxyUrl).toBeDefined()
   })
 
+  it('getProxyUrl returns proxyUrl if http_proxy has no protocol', () => {
+    process.env['http_proxy'] = 'myproxysvr'
+    const proxyUrl = pm.getProxyUrl(new URL('http://github.com'))
+    expect(proxyUrl?.toString()).toBe('http://myproxysvr/')
+  })
+
   it('checkBypass returns true if host as no_proxy list', () => {
     process.env['no_proxy'] = 'myserver'
     const bypass = pm.checkBypass(new URL('https://myserver'))
@@ -145,30 +151,73 @@ describe('proxy', () => {
     expect(bypass).toBeFalsy()
   })
 
+  it('checkBypass returns true if host with subdomain in no_proxy', () => {
+    process.env['no_proxy'] = 'myserver.com'
+    const bypass = pm.checkBypass(new URL('https://sub.myserver.com'))
+    expect(bypass).toBeTruthy()
+  })
+
+  it('checkBypass returns false if no_proxy is subdomain', () => {
+    process.env['no_proxy'] = 'myserver.com'
+    const bypass = pm.checkBypass(new URL('https://myserver.com.evil.org'))
+    expect(bypass).toBeFalsy()
+  })
+
+  it('checkBypass returns false if no_proxy is part of domain', () => {
+    process.env['no_proxy'] = 'myserver.com'
+    const bypass = pm.checkBypass(new URL('https://evilmyserver.com'))
+    expect(bypass).toBeFalsy()
+  })
+
+  // Do not strip leading dots as per https://github.com/actions/runner/blob/97195bad5870e2ad0915ebfef1616083aacf5818/docs/adrs/0263-proxy-support.md
+  it('checkBypass returns false if host with leading dot in no_proxy', () => {
+    process.env['no_proxy'] = '.myserver.com'
+    const bypass = pm.checkBypass(new URL('https://myserver.com'))
+    expect(bypass).toBeFalsy()
+  })
+
+  it('checkBypass returns true if host with subdomain in no_proxy defined with leading "."', () => {
+    process.env['no_proxy'] = '.myserver.com'
+    const bypass = pm.checkBypass(new URL('https://sub.myserver.com'))
+    expect(bypass).toBeTruthy()
+  })
+
+  it('checkBypass returns true if no_proxy is "*"', () => {
+    process.env['no_proxy'] = '*'
+    const bypass = pm.checkBypass(new URL('https://anything.whatsoever.com'))
+    expect(bypass).toBeTruthy()
+  })
+
+  it('checkBypass returns true if no_proxy contains comma separated "*"', () => {
+    process.env['no_proxy'] = 'domain.com,* , example.com'
+    const bypass = pm.checkBypass(new URL('https://anything.whatsoever.com'))
+    expect(bypass).toBeTruthy()
+  })
+
   it('HttpClient does basic http get request through proxy', async () => {
     process.env['http_proxy'] = _proxyUrl
     const httpClient = new httpm.HttpClient()
     const res: httpm.HttpClientResponse = await httpClient.get(
-      'http://httpbin.org/get'
+      'http://postman-echo.com/get'
     )
     expect(res.message.statusCode).toBe(200)
     const body: string = await res.readBody()
     const obj = JSON.parse(body)
-    expect(obj.url).toBe('http://httpbin.org/get')
-    expect(_proxyConnects).toEqual(['httpbin.org:80'])
+    expect(obj.url).toBe('http://postman-echo.com/get')
+    expect(_proxyConnects).toEqual(['postman-echo.com:80'])
   })
 
-  it('HttoClient does basic http get request when bypass proxy', async () => {
+  it('HttpClient does basic http get request when bypass proxy', async () => {
     process.env['http_proxy'] = _proxyUrl
-    process.env['no_proxy'] = 'httpbin.org'
+    process.env['no_proxy'] = 'postman-echo.com'
     const httpClient = new httpm.HttpClient()
     const res: httpm.HttpClientResponse = await httpClient.get(
-      'http://httpbin.org/get'
+      'http://postman-echo.com/get'
     )
     expect(res.message.statusCode).toBe(200)
     const body: string = await res.readBody()
     const obj = JSON.parse(body)
-    expect(obj.url).toBe('http://httpbin.org/get')
+    expect(obj.url).toBe('http://postman-echo.com/get')
     expect(_proxyConnects).toHaveLength(0)
   })
 
@@ -176,27 +225,52 @@ describe('proxy', () => {
     process.env['https_proxy'] = _proxyUrl
     const httpClient = new httpm.HttpClient()
     const res: httpm.HttpClientResponse = await httpClient.get(
-      'https://httpbin.org/get'
+      'https://postman-echo.com/get'
     )
     expect(res.message.statusCode).toBe(200)
     const body: string = await res.readBody()
     const obj = JSON.parse(body)
-    expect(obj.url).toBe('https://httpbin.org/get')
-    expect(_proxyConnects).toEqual(['httpbin.org:443'])
+    expect(obj.url).toBe('https://postman-echo.com/get')
+    expect(_proxyConnects).toEqual(['postman-echo.com:443'])
   })
 
   it('HttpClient does basic https get request when bypass proxy', async () => {
     process.env['https_proxy'] = _proxyUrl
-    process.env['no_proxy'] = 'httpbin.org'
+    process.env['no_proxy'] = 'postman-echo.com'
     const httpClient = new httpm.HttpClient()
     const res: httpm.HttpClientResponse = await httpClient.get(
-      'https://httpbin.org/get'
+      'https://postman-echo.com/get'
     )
     expect(res.message.statusCode).toBe(200)
     const body: string = await res.readBody()
     const obj = JSON.parse(body)
-    expect(obj.url).toBe('https://httpbin.org/get')
+    expect(obj.url).toBe('https://postman-echo.com/get')
     expect(_proxyConnects).toHaveLength(0)
+  })
+
+  it('HttpClient bypasses proxy for loopback addresses (localhost, ::1, 127.*)', async () => {
+    // setup a server listening on localhost:8091
+    const server = http.createServer((request, response) => {
+      response.writeHead(200)
+      request.pipe(response)
+    })
+    server.listen(8091)
+    try {
+      process.env['http_proxy'] = _proxyUrl
+      const httpClient = new httpm.HttpClient()
+      let res = await httpClient.get('http://localhost:8091')
+      expect(res.message.statusCode).toBe(200)
+      res = await httpClient.get('http://127.0.0.1:8091')
+      expect(res.message.statusCode).toBe(200)
+
+      // no support for ipv6 for now
+      expect(httpClient.get('http://[::1]:8091')).rejects.toThrow()
+
+      // proxy at _proxyUrl was ignored
+      expect(_proxyConnects).toEqual([])
+    } finally {
+      server.close()
+    }
   })
 
   it('proxyAuth not set in tunnel agent when authentication is not provided', async () => {

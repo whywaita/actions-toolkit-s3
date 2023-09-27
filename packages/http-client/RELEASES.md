@@ -1,5 +1,15 @@
 ## Releases
 
+## 2.1.1
+- Add `HttpClientResponse.readBodyBuffer` method to read from a response stream and return a buffer [#1475](https://github.com/actions/toolkit/pull/1475)
+
+## 2.1.0
+- Add support for `*` and subdomains in `no_proxy` [#1355](https://github.com/actions/toolkit/pull/1355) [#1223](https://github.com/actions/toolkit/pull/1223)
+- Bypass proxy for loopback IP adresses [#1360](https://github.com/actions/toolkit/pull/1360))
+
+## 2.0.1
+- Fix an issue with missing `tunnel` dependency [#1085](https://github.com/actions/toolkit/pull/1085)
+
 ## 2.0.0
 - The package is now compiled with TypeScript's [`strict` compiler setting](https://www.typescriptlang.org/tsconfig#strict). To comply with stricter rules:
   - Some exported types now include `| null` or `| undefined`, matching their actual behavior.

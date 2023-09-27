@@ -1,5 +1,7 @@
+/// <reference types="node" />
 import { TransferProgressEvent } from '@azure/ms-rest-js';
 import { S3ClientConfig } from '@aws-sdk/client-s3';
+import * as fs from 'fs';
 import { DownloadOptions } from '../options';
 /**
  * Class for tracking the download state and displaying stats.
@@ -64,6 +66,13 @@ export declare class DownloadProgress {
  * @param archivePath the local path where the cache is saved
  */
 export declare function downloadCacheHttpClient(archiveLocation: string, archivePath: string): Promise<void>;
+/**
+ * Download the cache using the Actions toolkit http-client concurrently
+ *
+ * @param archiveLocation the URL for the cache
+ * @param archivePath the local path where the cache is saved
+ */
+export declare function downloadCacheHttpClientConcurrent(archiveLocation: string, archivePath: fs.PathLike, options: DownloadOptions): Promise<void>;
 /**
  * Download the cache using the Azure Storage SDK.  Only call this method if the
  * URL points to an Azure Storage endpoint.
