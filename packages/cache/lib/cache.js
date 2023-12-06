@@ -110,7 +110,7 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
                 compressionMethod,
                 enableCrossOsArchive
             }, s3Options, s3BucketName);
-            if (!(cacheEntry === null || cacheEntry === void 0 ? void 0 : cacheEntry.archiveLocation)) {
+            if (!cacheEntry) {
                 // Cache not found
                 return undefined;
             }

@@ -106,7 +106,7 @@ export async function restoreCache(
       s3Options,
       s3BucketName
     )
-    if (!cacheEntry?.archiveLocation) {
+    if (!cacheEntry) {
       // Cache not found
       return undefined
     }
