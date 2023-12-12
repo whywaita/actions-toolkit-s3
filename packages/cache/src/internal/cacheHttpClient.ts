@@ -158,7 +158,8 @@ async function getCacheEntryS3(
     if (found && found.LastModified) {
       return {
         cacheKey: primaryKey,
-        creationTime: found.LastModified.toString()
+        creationTime: found.LastModified.toString(),
+        archiveLocation: `s3://${found.Key?.toString()}`
       }
     }
 
@@ -334,7 +335,14 @@ export async function downloadCache(
   const archiveUrl = new URL(archiveLocation)
   const downloadOptions = getDownloadOptions(options)
 
-  if (archiveUrl.hostname.endsWith('.blob.core.windows.net')) {
+  if (s3Options && s3BucketName && cacheEntry.cacheKey) {
+    await downloadCacheStorageS3(
+        cacheEntry.cacheKey,
+        archivePath,
+        s3Options,
+        s3BucketName
+    )
+  } else if (archiveUrl.hostname.endsWith('.blob.core.windows.net')) {
     if (downloadOptions.useAzureSdk) {
       // Use Azure storage SDK to download caches hosted on Azure to improve speed and reliability.
       await downloadCacheStorageSDK(
@@ -353,13 +361,6 @@ export async function downloadCache(
       // Otherwise, download using the Actions http-client.
       await downloadCacheHttpClient(archiveLocation, archivePath)
     }
-  } else if (s3Options && s3BucketName && cacheEntry.cacheKey) {
-    await downloadCacheStorageS3(
-      cacheEntry.cacheKey,
-      archivePath,
-      s3Options,
-      s3BucketName
-    )
   } else {
     await downloadCacheHttpClient(archiveLocation, archivePath)
   }
