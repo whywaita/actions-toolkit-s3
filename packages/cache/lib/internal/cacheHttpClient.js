@@ -88,6 +88,7 @@ function getCacheVersion(paths, compressionMethod, enableCrossOsArchive = false)
 }
 exports.getCacheVersion = getCacheVersion;
 function getCacheEntryS3(s3Options, s3BucketName, keys, paths) {
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
         const primaryKey = keys[0];
         const s3client = new client_s3_1.S3Client(s3Options);
@@ -120,7 +121,8 @@ function getCacheEntryS3(s3Options, s3BucketName, keys, paths) {
             if (found && found.LastModified) {
                 return {
                     cacheKey: primaryKey,
-                    creationTime: found.LastModified.toString()
+                    creationTime: found.LastModified.toString(),
+                    archiveLocation: `s3://${(_a = found.Key) === null || _a === void 0 ? void 0 : _a.toString()}`
                 };
             }
             response.Contents.map((obj) => contents.push({
@@ -247,7 +249,10 @@ function downloadCache(cacheEntry, archivePath, options, s3Options, s3BucketName
         const archiveLocation = (_a = cacheEntry.archiveLocation) !== null && _a !== void 0 ? _a : 'https://example.com'; // for dummy
         const archiveUrl = new url_1.URL(archiveLocation);
         const downloadOptions = (0, options_1.getDownloadOptions)(options);
-        if (archiveUrl.hostname.endsWith('.blob.core.windows.net')) {
+        if (s3Options && s3BucketName && cacheEntry.cacheKey) {
+            yield (0, downloadUtils_1.downloadCacheStorageS3)(cacheEntry.cacheKey, archivePath, s3Options, s3BucketName);
+        }
+        else if (archiveUrl.hostname.endsWith('.blob.core.windows.net')) {
             if (downloadOptions.useAzureSdk) {
                 // Use Azure storage SDK to download caches hosted on Azure to improve speed and reliability.
                 yield (0, downloadUtils_1.downloadCacheStorageSDK)(archiveLocation, archivePath, downloadOptions);
@@ -260,9 +265,6 @@ function downloadCache(cacheEntry, archivePath, options, s3Options, s3BucketName
                 // Otherwise, download using the Actions http-client.
                 yield (0, downloadUtils_1.downloadCacheHttpClient)(archiveLocation, archivePath);
             }
-        }
-        else if (s3Options && s3BucketName && cacheEntry.cacheKey) {
-            yield (0, downloadUtils_1.downloadCacheStorageS3)(cacheEntry.cacheKey, archivePath, s3Options, s3BucketName);
         }
         else {
             yield (0, downloadUtils_1.downloadCacheHttpClient)(archiveLocation, archivePath);
