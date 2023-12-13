@@ -186,7 +186,8 @@ async function getCacheEntryS3(
   if (found != null && found.LastModified) {
     return {
       cacheKey: found.Key,
-      creationTime: found.LastModified.toString()
+      creationTime: found.LastModified.toString(),
+      archiveLocation: `s3://${found.Key.toString()}`
     }
   }
 
