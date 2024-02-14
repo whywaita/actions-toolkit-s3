@@ -120,7 +120,8 @@ function getCacheEntryS3(s3Options, s3BucketName, keys, paths) {
             if (found && found.LastModified) {
                 return {
                     cacheKey: primaryKey,
-                    creationTime: found.LastModified.toString()
+                    creationTime: found.LastModified.toString(),
+                    archiveLocation: "https://s3.amazonaws.com/" // dummy
                 };
             }
             response.Contents.map((obj) => contents.push({
@@ -142,7 +143,8 @@ function getCacheEntryS3(s3Options, s3BucketName, keys, paths) {
         if (found != null && found.LastModified) {
             return {
                 cacheKey: found.Key,
-                creationTime: found.LastModified.toString()
+                creationTime: found.LastModified.toString(),
+                archiveLocation: "https://s3.amazonaws.com/" // dummy
             };
         }
         return null;

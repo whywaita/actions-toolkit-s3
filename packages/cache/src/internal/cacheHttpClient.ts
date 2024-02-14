@@ -158,7 +158,8 @@ async function getCacheEntryS3(
     if (found && found.LastModified) {
       return {
         cacheKey: primaryKey,
-        creationTime: found.LastModified.toString()
+        creationTime: found.LastModified.toString(),
+        archiveLocation: "https://s3.amazonaws.com/" // dummy
       }
     }
 
@@ -185,7 +186,8 @@ async function getCacheEntryS3(
   if (found != null && found.LastModified) {
     return {
       cacheKey: found.Key,
-      creationTime: found.LastModified.toString()
+      creationTime: found.LastModified.toString(),
+      archiveLocation: "https://s3.amazonaws.com/" // dummy
     }
   }
 
