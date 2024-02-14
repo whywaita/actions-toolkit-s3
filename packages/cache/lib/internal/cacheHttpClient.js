@@ -97,6 +97,17 @@ function getCacheEntryS3(s3Options, s3BucketName, keys, paths) {
         const param = {
             Bucket: s3BucketName
         };
+        if (primaryKey.includes('/')) {
+            let prefix = primaryKey.replace(/[^/]*$/, '');
+            while (prefix.endsWith('/')) {
+                if (keys.every((k) => k.startsWith(prefix))) {
+                    core.debug(`Object prefix: ${prefix}`);
+                    param.Prefix = prefix;
+                    break;
+                }
+                prefix = prefix.replace(/[^/]*\/$/, '');
+            }
+        }
         for (;;) {
             core.debug(`ListObjects Count: ${count}`);
             if (s3ContinuationToken != undefined) {

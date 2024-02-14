@@ -132,6 +132,18 @@ async function getCacheEntryS3(
     Bucket: s3BucketName
   } as ListObjectsV2CommandInput
 
+  if (primaryKey.includes('/')) {
+      let prefix = primaryKey.replace(/[^/]*$/, '')
+      while (prefix.endsWith('/')) {
+        if (keys.every((k) => k.startsWith(prefix))) {
+            core.debug(`Object prefix: ${prefix}`)
+            param.Prefix = prefix
+            break
+        }
+        prefix = prefix.replace(/[^/]*\/$/, '')
+      }
+  }
+
   for (;;) {
     core.debug(`ListObjects Count: ${count}`)
     if (s3ContinuationToken != undefined) {
