@@ -1,8 +1,11 @@
 import * as core from '@actions/core'
-import {UploadOptions, UploadResponse} from '../shared/interfaces'
+import {
+  UploadArtifactOptions,
+  UploadArtifactResponse
+} from '../shared/interfaces'
 import {getExpiration} from './retention'
 import {validateArtifactName} from './path-and-artifact-name-validation'
-import {createArtifactTwirpClient} from '../shared/artifact-twirp-client'
+import {internalArtifactTwirpClient} from '../shared/artifact-twirp-client'
 import {
   UploadZipSpecification,
   getUploadZipSpecification,
@@ -16,13 +19,14 @@ import {
   FinalizeArtifactRequest,
   StringValue
 } from '../../generated'
+import {FilesNotFoundError, InvalidResponseError} from '../shared/errors'
 
 export async function uploadArtifact(
   name: string,
   files: string[],
   rootDirectory: string,
-  options?: UploadOptions | undefined
-): Promise<UploadResponse> {
+  options?: UploadArtifactOptions | undefined
+): Promise<UploadArtifactResponse> {
   validateArtifactName(name)
   validateRootDirectory(rootDirectory)
 
@@ -31,31 +35,16 @@ export async function uploadArtifact(
     rootDirectory
   )
   if (zipSpecification.length === 0) {
-    core.warning(`No files were found to upload`)
-    return {
-      success: false
-    }
+    throw new FilesNotFoundError(
+      zipSpecification.flatMap(s => (s.sourcePath ? [s.sourcePath] : []))
+    )
   }
-
-  const zipUploadStream = await createZipUploadStream(zipSpecification)
 
   // get the IDs needed for the artifact creation
   const backendIds = getBackendIdsFromToken()
-  if (!backendIds.workflowRunBackendId || !backendIds.workflowJobRunBackendId) {
-    core.warning(
-      `Failed to get the necessary backend ids which are required to create the artifact`
-    )
-    return {
-      success: false
-    }
-  }
-  core.debug(`Workflow Run Backend ID: ${backendIds.workflowRunBackendId}`)
-  core.debug(
-    `Workflow Job Run Backend ID: ${backendIds.workflowJobRunBackendId}`
-  )
 
   // create the artifact client
-  const artifactClient = createArtifactTwirpClient('upload')
+  const artifactClient = internalArtifactTwirpClient()
 
   // create the artifact
   const createArtifactReq: CreateArtifactRequest = {
@@ -71,26 +60,24 @@ export async function uploadArtifact(
     createArtifactReq.expiresAt = expiresAt
   }
 
-  const createArtifactResp = await artifactClient.CreateArtifact(
-    createArtifactReq
-  )
+  const createArtifactResp =
+    await artifactClient.CreateArtifact(createArtifactReq)
   if (!createArtifactResp.ok) {
-    core.warning(`Failed to create artifact`)
-    return {
-      success: false
-    }
+    throw new InvalidResponseError(
+      'CreateArtifact: response from backend was not ok'
+    )
   }
+
+  const zipUploadStream = await createZipUploadStream(
+    zipSpecification,
+    options?.compressionLevel
+  )
 
   // Upload zip to blob storage
   const uploadResult = await uploadZipToBlobStorage(
     createArtifactResp.signedUploadUrl,
     zipUploadStream
   )
-  if (uploadResult.isSuccess === false) {
-    return {
-      success: false
-    }
-  }
 
   // finalize the artifact
   const finalizeArtifactReq: FinalizeArtifactRequest = {
@@ -100,22 +87,20 @@ export async function uploadArtifact(
     size: uploadResult.uploadSize ? uploadResult.uploadSize.toString() : '0'
   }
 
-  if (uploadResult.md5Hash) {
+  if (uploadResult.sha256Hash) {
     finalizeArtifactReq.hash = StringValue.create({
-      value: `md5:${uploadResult.md5Hash}`
+      value: `sha256:${uploadResult.sha256Hash}`
     })
   }
 
   core.info(`Finalizing artifact upload`)
 
-  const finalizeArtifactResp = await artifactClient.FinalizeArtifact(
-    finalizeArtifactReq
-  )
+  const finalizeArtifactResp =
+    await artifactClient.FinalizeArtifact(finalizeArtifactReq)
   if (!finalizeArtifactResp.ok) {
-    core.warning(`Failed to finalize artifact`)
-    return {
-      success: false
-    }
+    throw new InvalidResponseError(
+      'FinalizeArtifact: response from backend was not ok'
+    )
   }
 
   const artifactId = BigInt(finalizeArtifactResp.artifactId)
@@ -124,7 +109,6 @@ export async function uploadArtifact(
   )
 
   return {
-    success: true,
     size: uploadResult.uploadSize,
     id: Number(artifactId)
   }

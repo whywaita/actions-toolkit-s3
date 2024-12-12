@@ -16,9 +16,7 @@ export declare function isFeatureAvailable(): boolean;
  * Restores cache from keys
  *
  * @param paths a list of file paths to restore from the cache
- * @param primaryKey an explicit key for restoring the cache
- * @param restoreKeys an optional ordered list of keys to use for restoring the cache if no cache hit occurred for key
- * @param options cache download options
+ * @param downloadOptions cache download options
  * @param enableCrossOsArchive an optional boolean enabled to restore on windows any cache created on any platform
  * @param s3Options upload options for AWS S3
  * @param s3BucketName a name of AWS S3 bucket

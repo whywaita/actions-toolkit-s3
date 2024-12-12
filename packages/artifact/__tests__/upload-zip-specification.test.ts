@@ -1,11 +1,11 @@
 import * as io from '../../io/src/io'
 import * as path from 'path'
 import {promises as fs} from 'fs'
-import * as core from '@actions/core'
 import {
   getUploadZipSpecification,
   validateRootDirectory
 } from '../src/internal/upload/upload-zip-specification'
+import {noopLogs} from './common'
 
 const root = path.join(__dirname, '_temp', 'upload-specification')
 const goodItem1Path = path.join(
@@ -51,11 +51,7 @@ const artifactFilesToUpload = [
 
 describe('Search', () => {
   beforeAll(async () => {
-    // mock all output so that there is less noise when running tests
-    jest.spyOn(console, 'log').mockImplementation(() => {})
-    jest.spyOn(core, 'debug').mockImplementation(() => {})
-    jest.spyOn(core, 'info').mockImplementation(() => {})
-    jest.spyOn(core, 'warning').mockImplementation(() => {})
+    noopLogs()
 
     // clear temp directory
     await io.rmRF(root)
@@ -308,5 +304,23 @@ describe('Search', () => {
         )
       }
     }
+  })
+
+  it('Upload Specification - Includes symlinks', async () => {
+    const targetPath = path.join(root, 'link-dir', 'symlink-me.txt')
+    await fs.mkdir(path.dirname(targetPath), {recursive: true})
+    await fs.writeFile(targetPath, 'symlink file content')
+
+    const uploadPath = path.join(root, 'upload-dir', 'symlink.txt')
+    await fs.mkdir(path.dirname(uploadPath), {recursive: true})
+    await fs.symlink(targetPath, uploadPath, 'file')
+
+    const specifications = getUploadZipSpecification([uploadPath], root)
+    expect(specifications.length).toEqual(1)
+    expect(specifications[0].sourcePath).toEqual(uploadPath)
+    expect(specifications[0].destinationPath).toEqual(
+      path.join('/upload-dir', 'symlink.txt')
+    )
+    expect(specifications[0].stats.isSymbolicLink()).toBe(true)
   })
 })
