@@ -1,9 +1,16 @@
-import {downloadCache, getCacheVersion} from '../src/internal/cacheHttpClient'
+import {downloadCache} from '../src/internal/cacheHttpClient'
+import {getCacheVersion} from '../src/internal/cacheUtils'
 import {CompressionMethod} from '../src/internal/constants'
 import * as downloadUtils from '../src/internal/downloadUtils'
 import {DownloadOptions, getDownloadOptions} from '../src/options'
 
 jest.mock('../src/internal/downloadUtils')
+
+test('getCacheVersion does not mutate arguments', async () => {
+  const paths = ['node_modules']
+  getCacheVersion(paths, undefined, true)
+  expect(paths).toEqual(['node_modules'])
+})
 
 test('getCacheVersion with one path returns version', async () => {
   const paths = ['node_modules']

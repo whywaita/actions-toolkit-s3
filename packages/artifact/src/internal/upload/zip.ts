@@ -1,9 +1,11 @@
 import * as stream from 'stream'
+import {realpath} from 'fs/promises'
 import * as archiver from 'archiver'
 import * as core from '@actions/core'
-import {createReadStream} from 'fs'
 import {UploadZipSpecification} from './upload-zip-specification'
 import {getUploadChunkSize} from '../shared/config'
+
+export const DEFAULT_COMPRESSION_LEVEL = 6
 
 // Custom stream transformer so we can set the highWaterMark property
 // See https://github.com/nodejs/node/issues/8855
@@ -21,14 +23,16 @@ export class ZipUploadStream extends stream.Transform {
 }
 
 export async function createZipUploadStream(
-  uploadSpecification: UploadZipSpecification[]
+  uploadSpecification: UploadZipSpecification[],
+  compressionLevel: number = DEFAULT_COMPRESSION_LEVEL
 ): Promise<ZipUploadStream> {
+  core.debug(
+    `Creating Artifact archive with compressionLevel: ${compressionLevel}`
+  )
+
   const zip = archiver.create('zip', {
-    zlib: {level: 9} // Sets the compression level.
-    // Available options are 0-9
-    // 0 => no compression
-    // 1 => fastest with low compression
-    // 9 => highest compression ratio but the slowest
+    highWaterMark: getUploadChunkSize(),
+    zlib: {level: compressionLevel}
   })
 
   // register callbacks for various events during the zip lifecycle
@@ -39,8 +43,14 @@ export async function createZipUploadStream(
 
   for (const file of uploadSpecification) {
     if (file.sourcePath !== null) {
-      // Add a normal file to the zip
-      zip.append(createReadStream(file.sourcePath), {
+      // Check if symlink and resolve the source path
+      let sourcePath = file.sourcePath
+      if (file.stats.isSymbolicLink()) {
+        sourcePath = await realpath(file.sourcePath)
+      }
+
+      // Add the file to the zip
+      zip.file(sourcePath, {
         name: file.destinationPath
       })
     } else {

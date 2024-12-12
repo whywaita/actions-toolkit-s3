@@ -10,4 +10,5 @@ export declare function getCacheFileName(compressionMethod: CompressionMethod): 
 export declare function getGnuTarPathOnWindows(): Promise<string>;
 export declare function isZstdInstalled(): Promise<boolean>;
 export declare function assertDefined<T>(name: string, value?: T): T;
-export declare function isGhes(): boolean;
+export declare function getCacheVersion(paths: string[], compressionMethod?: CompressionMethod, enableCrossOsArchive?: boolean): string;
+export declare function getRuntimeToken(): string;
